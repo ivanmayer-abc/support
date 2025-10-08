@@ -240,43 +240,6 @@ export default function BookOddsManagement() {
                   <div className="flex justify-between items-center mb-4">
                     <div>
                       <h4 className="font-medium text-gray-800">{event.name}</h4>
-                      <p className="text-sm text-gray-500">
-                        {new Date(event.date).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        event.status === 'UPCOMING' ? 'bg-blue-100 text-blue-800' :
-                        event.status === 'LIVE' ? 'bg-green-100 text-green-800' :
-                        event.status === 'COMPLETED' ? 'bg-gray-100 text-gray-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {event.status.toLowerCase()}
-                      </span>
-                      {event.status === 'COMPLETED' && (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={winningOutcomeMap[event.id] || ''}
-                            onChange={(e) => handleWinningOutcomeChange(event.id, e.target.value)}
-                            className="text-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          >
-                            <option value="">Select winner...</option>
-                            {event.outcomes.map(outcome => (
-                              <option key={outcome.id} value={outcome.id}>
-                                {outcome.name}
-                              </option>
-                            ))}
-                          </select>
-                          <Button
-                            onClick={() => settleBetsForEvent(event.id, winningOutcomeMap[event.id])}
-                            variant="outline"
-                            size="sm"
-                            disabled={!winningOutcomeMap[event.id]}
-                          >
-                            Settle Bets
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   </div>
                   
@@ -309,7 +272,6 @@ export default function BookOddsManagement() {
                               value={outcome.odds}
                               onChange={(e) => updateOutcomeOdds(outcome.id, parseFloat(e.target.value))}
                               className="w-20 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                              disabled={event.status === 'COMPLETED'}
                             />
                           </div>
                           
@@ -319,48 +281,6 @@ export default function BookOddsManagement() {
                               {(outcome.probability * 100).toFixed(1)}%
                             </div>
                           </div>
-
-                          {event.status === 'COMPLETED' && (
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={winningOutcomeMap[event.id] || ''}
-                                onChange={(e) => handleWinningOutcomeChange(event.id, e.target.value)}
-                                className="text-xs rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                              >
-                                <option value="">Select winner...</option>
-                                {event.outcomes.map(outcome => (
-                                  <option key={outcome.id} value={outcome.id}>
-                                    {outcome.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <Button
-                                onClick={() => settleBetsForEvent(event.id, winningOutcomeMap[event.id])}
-                                variant="outline"
-                                size="sm"
-                                disabled={!winningOutcomeMap[event.id]}
-                              >
-                                Settle
-                              </Button>
-                              <Button
-                                onClick={() => forceSettleEvent(event.id, winningOutcomeMap[event.id])}
-                                variant="outline"
-                                size="sm"
-                                className="bg-red-100 text-red-700"
-                                disabled={!winningOutcomeMap[event.id]}
-                              >
-                                Force Settle
-                              </Button>
-                              <Button
-                                onClick={() => debugSettlement(event.id)}
-                                variant="outline"
-                                size="sm"
-                                className="bg-purple-100"
-                              >
-                                Debug
-                              </Button>
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -379,9 +299,6 @@ export default function BookOddsManagement() {
               <div className="text-sm text-gray-500">Total Events</div>
             </div>
             <div className="bg-white p-4 rounded-lg border text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {selectedBook.bets.length}
-              </div>
               <div className="text-sm text-gray-500">Total Bets</div>
             </div>
             <div className="bg-white p-4 rounded-lg border text-center">
