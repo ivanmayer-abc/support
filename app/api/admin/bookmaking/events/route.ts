@@ -29,7 +29,7 @@ export async function GET() {
         }
       },
       orderBy: {
-        date: 'asc'
+        createdAt: 'asc'
       }
     })
 
