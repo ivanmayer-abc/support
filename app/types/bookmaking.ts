@@ -48,3 +48,7 @@ export interface Outcome {
   result: 'PENDING' | 'WIN' | 'LOSE' | 'VOID'
   eventId: string
 }
+
+export interface Bet {
+  status: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'CANCELLED'
+}

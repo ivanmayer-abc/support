@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Book } from '@/app/types/bookmaking'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,8 +28,29 @@ export default function BookSettlementDialog({
   const [winningOutcomes, setWinningOutcomes] = useState<{[eventId: string]: string}>({})
   const [settling, setSettling] = useState(false)
   const [settledEvents, setSettledEvents] = useState<Set<string>>(new Set())
+  const [refreshedBook, setRefreshedBook] = useState<Book | null>(null)
 
-  // Safe helper functions
+  useEffect(() => {
+    if (isOpen) {
+      refreshBookData()
+    }
+  }, [isOpen, book.id])
+
+  const refreshBookData = async () => {
+    try {
+      const response = await fetch(`/api/admin/bookmaking/books/${book.id}`)
+      if (response.ok) {
+        const freshBook = await response.json()
+        setRefreshedBook(freshBook)
+      }
+    } catch (error) {
+      console.error('Error refreshing book data:', error)
+      setRefreshedBook(book)
+    }
+  }
+
+  const currentBook = refreshedBook || book
+
   const getEventBetCount = (event: any): number => {
     return event.bets?.length || 0
   }
@@ -53,8 +74,7 @@ export default function BookSettlementDialog({
     return outcome.result || null
   }
 
-  // Get only pending events that need settlement
-  const pendingEvents = (book.events || []).filter(event => 
+  const pendingEvents = (currentBook.events || []).filter(event => 
     event
   )
 
@@ -91,6 +111,8 @@ export default function BookSettlementDialog({
       })
 
       if (response.ok) {
+        const result = await response.json()
+        console.log('Settlement result:', result.data)
         setSettledEvents(prev => new Set(prev).add(eventId))
         return true
       } else {
@@ -119,12 +141,14 @@ export default function BookSettlementDialog({
       // Settle events one by one to handle errors gracefully
       for (const event of pendingEvents) {
         if (!settledEvents.has(event.id)) {
+          console.log(`Settling event: ${event.name}`)
           await settleEvent(event.id)
         }
       }
 
       // Update book status to SETTLED
-      await fetch(`/api/admin/bookmaking/books/${book.id}`, {
+      console.log(`📚 Updating book ${book.id} status to SETTLED`)
+      const updateResponse = await fetch(`/api/admin/bookmaking/books/${book.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -132,10 +156,22 @@ export default function BookSettlementDialog({
         body: JSON.stringify({ status: 'SETTLED' }),
       })
 
+      console.log('Book update response status:', updateResponse.status)
+      
+      if (updateResponse.ok) {
+        const updateResult = await updateResponse.json()
+        console.log('Book update result:', updateResult)
+      } else {
+        const error = await updateResponse.text()
+        console.error('Book update failed:', error)
+        throw new Error(`Failed to update book status: ${error}`)
+      }
+
       alert(`Book settled successfully! All ${pendingEvents.length} events have been processed.`)
       onSettlementComplete()
       
     } catch (error: any) {
+      console.error('Settlement error:', error)
       alert(`Settlement failed: ${error.message || 'Unknown error'}`)
     } finally {
       setSettling(false)
@@ -154,9 +190,13 @@ export default function BookSettlementDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Settle Book: {book.title}</DialogTitle>
+          <DialogTitle>Settle Book: {currentBook.title}</DialogTitle>
           <DialogDescription>
             Select winning outcomes for each event and settle the entire book at once.
+            <br />
+            <span className="text-yellow-600 font-medium">
+              Note: Cancelled bets will be automatically skipped during settlement.
+            </span>
           </DialogDescription>
         </DialogHeader>
 

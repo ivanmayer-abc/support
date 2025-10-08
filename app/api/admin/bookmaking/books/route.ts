@@ -173,7 +173,7 @@ export async function GET() {
         bets: true
       },
       orderBy: {
-        date: 'desc' // Order books by date
+        date: 'desc'
       }
     })
 
