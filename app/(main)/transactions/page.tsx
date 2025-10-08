@@ -760,7 +760,7 @@ const AdminTransactionsPage = () => {
               
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  let pageNum;
+                  let pageNum: number;
                   if (pagination.totalPages <= 5) {
                     pageNum = i + 1;
                   } else if (pagination.currentPage <= 3) {
