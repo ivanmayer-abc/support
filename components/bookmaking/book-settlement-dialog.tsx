@@ -55,7 +55,7 @@ export default function BookSettlementDialog({
 
   // Get only pending events that need settlement
   const pendingEvents = (book.events || []).filter(event => 
-    event.status !== 'COMPLETED' && event.status !== 'CANCELLED'
+    event
   )
 
   const handleOutcomeSelect = (eventId: string, outcomeId: string) => {
