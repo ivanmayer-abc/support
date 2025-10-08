@@ -472,7 +472,7 @@ export default function BookManagement({ book }: BookManagementProps) {
                           1st Fast Bet Position
                           {firstFastBetEvent && firstFastBetEvent !== event && (
                             <span className="text-xs text-muted-foreground block">
-                              Already selected in "{firstFastBetEvent.name || 'another option'}"
+                              Already selected in &quot;{firstFastBetEvent.name || 'another option'}&quot;
                             </span>
                           )}
                         </Label>
@@ -488,7 +488,7 @@ export default function BookManagement({ book }: BookManagementProps) {
                           2nd Fast Bet Position
                           {secondFastBetEvent && secondFastBetEvent !== event && (
                             <span className="text-xs text-muted-foreground block">
-                              Already selected in "{secondFastBetEvent.name || 'another option'}"
+                              Already selected in &quot;{secondFastBetEvent.name || 'another option'}&quot;
                             </span>
                           )}
                         </Label>
