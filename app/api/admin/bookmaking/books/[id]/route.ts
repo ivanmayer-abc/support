@@ -55,6 +55,135 @@ export async function GET(
   }
 }
 
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await currentUser()
+    if (!user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const { id } = params
+    const body = await request.json()
+    const { title, date, teams, events } = body
+
+    console.log(`🔧 [PUT] Updating book ${id} with data:`, { title, date, teamsCount: teams?.length, eventsCount: events?.length })
+
+    // Validate the book exists
+    const existingBook = await db.book.findUnique({
+      where: { id }
+    })
+
+    if (!existingBook) {
+      return NextResponse.json(
+        { error: 'Book not found' },
+        { status: 404 }
+      )
+    }
+
+    // Start a transaction to update book, teams, and events
+    const result = await db.$transaction(async (tx) => {
+      // Update the book
+      const updatedBook = await tx.book.update({
+        where: { id },
+        data: {
+          title,
+          date: new Date(date),
+        },
+      })
+
+      // Delete existing teams and events (cascading should handle outcomes and bets)
+      await tx.team.deleteMany({
+        where: { bookId: id }
+      })
+
+      await tx.event.deleteMany({
+        where: { bookId: id }
+      })
+
+      // Create new teams
+      const createdTeams = await Promise.all(
+        teams.map((team: any) =>
+          tx.team.create({
+            data: {
+              name: team.name,
+              image: team.image || null,
+              bookId: id,
+            },
+          })
+        )
+      )
+
+      // Create new events with outcomes
+      const createdEvents = await Promise.all(
+        events.map((event: any) =>
+          tx.event.create({
+            data: {
+              name: event.name,
+              isFirstFastOption: event.isFirstFastOption,
+              isSecondFastOption: event.isSecondFastOption,
+              bookId: id,
+              outcomes: {
+                create: event.outcomes.map((outcome: any) => ({
+                  name: outcome.name,
+                  odds: outcome.odds,
+                  probability: 0, // You might want to calculate this
+                  stake: 0, // Initialize with 0
+                  result: 'PENDING',
+                })),
+              },
+            },
+            include: {
+              outcomes: true,
+            },
+          })
+        )
+      )
+
+      return {
+        book: updatedBook,
+        teams: createdTeams,
+        events: createdEvents,
+      }
+    })
+
+    console.log(`✅ [PUT] Book ${id} updated successfully with ${result.teams.length} teams and ${result.events.length} events`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Book updated successfully',
+      data: result.book
+    })
+
+  } catch (error: any) {
+    console.error(`💥 [ADMIN_BOOKS_PUT] Error updating book ${params.id}:`, error)
+    
+    if (error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Book not found' },
+        { status: 404 }
+      )
+    }
+    
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'A book with this title already exists' },
+        { status: 400 }
+      )
+    }
+    
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -99,9 +228,6 @@ export async function PATCH(
         )
       }
       updateData.status = status
-      
-      // REMOVED: settledAt field since it doesn't exist in your schema
-      // If you need this field, you'll need to add it to your Prisma schema
     }
 
     if (title) updateData.title = title
