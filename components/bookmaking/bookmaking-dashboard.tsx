@@ -219,11 +219,6 @@ export default function AdminBookmakingDashboard() {
               Create
             </Button>
           </Link>
-          <Link href="/manage" className="font-bold text-3xl">
-            <Button size="lg" className='text-xl font-bold' variant="secondary">
-              Manage
-            </Button>
-          </Link>
         </div>
         
         <div className="flex items-center gap-3 w-full sm:w-auto">
