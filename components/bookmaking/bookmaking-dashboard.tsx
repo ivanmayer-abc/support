@@ -1,4 +1,3 @@
-// components/bookmaking/bookmaking-dashboard.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -34,6 +33,29 @@ export default function AdminBookmakingDashboard() {
   
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/admin/bookmaking/auto-settle', {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          console.log('🔄 Auto-settlement check completed');
+          fetchBooks();
+        }
+      } catch (error) {
+        console.error('Auto-settlement check failed:', error);
+      }
+    }, 2 * 60 * 1000);
+
+    fetch('/api/admin/bookmaking/auto-settle', { method: 'POST' })
+      .then(() => console.log('🔄 Initial auto-settlement check completed'))
+      .catch(console.error);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetchBooks()
