@@ -236,14 +236,6 @@ export default function AdminBookmakingDashboard() {
               </SelectContent>
             </Select>
           </div>
-          
-          <Button
-            onClick={fetchBooks}
-            variant="outline"
-            size="sm"
-          >
-            Refresh
-          </Button>
         </div>
       </div>
 

@@ -9,10 +9,25 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, AlertCircle, Users, Calendar, ArrowLeft, Save } from 'lucide-react'
+import { Plus, Trash2, AlertCircle, Users, Calendar, ArrowLeft, Save, Image, Trash } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { Book, Team, Event } from '@/app/types/bookmaking'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+const CATEGORIES = [
+  'Football',
+  'Basketball', 
+  'Cricket',
+  'Tennis',
+  'Baseball',
+  'Hockey',
+  'Rugby',
+  'Boxing',
+  'MMA',
+  'Esports',
+  'Other'
+]
 
 interface TeamForm {
   id?: string
@@ -37,25 +52,27 @@ export default function BookManagement({ book }: BookManagementProps) {
   const router = useRouter()
   const [title, setTitle] = useState(book.title)
   const [date, setDate] = useState(book.date ? new Date(book.date).toISOString().slice(0, 16) : '')
+  const [category, setCategory] = useState(book.category || '')
+  const [image, setImage] = useState(book.image || '')
   const [teams, setTeams] = useState<TeamForm[]>([])
   const [events, setEvents] = useState<EventForm[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  // Initialize form data when book changes
   useEffect(() => {
     if (book) {
       setTitle(book.title)
       setDate(book.date ? new Date(book.date).toISOString().slice(0, 16) : '')
+      setCategory(book.category || '')
+      setImage(book.image || '')
       
-      // Transform teams data
       const transformedTeams: TeamForm[] = (book.teams || []).map(team => ({
         id: team.id,
         name: team.name,
-        image: team.image || '' // Handle null image
+        image: team.image || ''
       }))
       setTeams(transformedTeams.length > 0 ? transformedTeams : [{ name: '', image: '' }])
       
-      // Transform events data
       const transformedEvents: EventForm[] = (book.events || []).map(event => ({
         id: event.id,
         name: event.name,
@@ -189,6 +206,11 @@ export default function BookManagement({ book }: BookManagementProps) {
       return
     }
 
+    if (!category) {
+      toast.error("Please select a category for the book")
+      return
+    }
+
     const firstFastBetCount = validEvents.filter(event => event.isFirstFastOption).length
     const secondFastBetCount = validEvents.filter(event => event.isSecondFastOption).length
 
@@ -213,6 +235,8 @@ export default function BookManagement({ book }: BookManagementProps) {
         body: JSON.stringify({
           title,
           date,
+          category,
+          image: image || null,
           teams: validTeams,
           events: validEvents.map(event => ({
             ...event,
@@ -228,7 +252,7 @@ export default function BookManagement({ book }: BookManagementProps) {
 
       if (response.ok) {
         toast.success("Book updated successfully!")
-        router.push('/') // Redirect to admin dashboard
+        router.push('/')
       } else {
         throw new Error(data.error || 'Failed to update book')
       }
@@ -237,6 +261,42 @@ export default function BookManagement({ book }: BookManagementProps) {
       toast.error(error.message || "Failed to update book. Please try again.")
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this book? This action cannot be undone.')) {
+      return
+    }
+
+    if (!session?.user?.id) {
+      toast.error("Please sign in to delete the book")
+      return
+    }
+
+    setIsDeleting(true)
+    
+    try {
+      const response = await fetch(`/api/admin/bookmaking/books/${book.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Book deleted successfully!")
+        router.push('/')
+      } else {
+        throw new Error(data.error || 'Failed to delete book')
+      }
+    } catch (error: any) {
+      console.error('Error deleting book:', error)
+      toast.error(error.message || "Failed to delete book. Please try again.")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -250,33 +310,42 @@ export default function BookManagement({ book }: BookManagementProps) {
 
   return (
     <div className="px-4 py-8">
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="outline"
-            onClick={() => router.back()}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Manage Book</h1>
-            <p className="text-muted-foreground mt-2">
-              Update book information, teams, and betting options
-            </p>
-          </div>
-        </div>
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Book Information */}
+        <div className="mb-8 flex justify-between">
+          <div className="flex items-center gap-4 mb-4">
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Manage Book</h1>
+            </div>
+          </div>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="min-w-32"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </>
+            )}
+          </Button>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Book Information</CardTitle>
-            <CardDescription>
-              Basic information about your betting book
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -290,21 +359,85 @@ export default function BookManagement({ book }: BookManagementProps) {
                 disabled={isSubmitting}
               />
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date">Book Date *</Label>
+                <Input
+                  id="date"
+                  type="datetime-local"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Category *</Label>
+                <Select value={category} onValueChange={setCategory} disabled={isSubmitting}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="date">Book Date *</Label>
+              <Label htmlFor="image" className="flex items-center gap-2">
+                <Image className="h-4 w-4" />
+                Book Image URL
+              </Label>
               <Input
-                id="date"
-                type="datetime-local"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
+                id="image"
+                type="url"
+                value={image}
+                onChange={(e) => setImage(e.target.value)}
+                placeholder="https://example.com/tournament-logo.png"
                 disabled={isSubmitting}
               />
+              <div className="flex items-center gap-4 mt-2">
+                {image && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-muted rounded overflow-hidden">
+                      <img 
+                        src={image} 
+                        alt="Book preview" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm text-muted-foreground">Preview</span>
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImage('')}
+                  disabled={!image || isSubmitting}
+                  className="flex items-center gap-2"
+                >
+                  <Trash className="h-3 w-3" />
+                  Clear
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Add a tournament logo, country flag, or sports image
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Teams Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -381,6 +514,21 @@ export default function BookManagement({ book }: BookManagementProps) {
                           placeholder="https://example.com/team-logo.png"
                           disabled={isSubmitting}
                         />
+                        {team.image && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="w-6 h-6 bg-muted rounded overflow-hidden">
+                              <img 
+                                src={team.image} 
+                                alt="Team preview" 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none'
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground">Preview</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -390,7 +538,6 @@ export default function BookManagement({ book }: BookManagementProps) {
           </CardContent>
         </Card>
 
-        {/* Betting Options Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -457,7 +604,6 @@ export default function BookManagement({ book }: BookManagementProps) {
                     </div>
                   </div>
 
-                  {/* Fast Bet Options */}
                   <div className="mb-6 p-4 bg-muted rounded-lg">
                     <Label className="text-base font-medium mb-3 block">Fast Bet Options</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -496,7 +642,6 @@ export default function BookManagement({ book }: BookManagementProps) {
                     </div>
                   </div>
 
-                  {/* Outcomes */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <Label className="text-base font-medium">Outcomes *</Label>
@@ -566,33 +711,46 @@ export default function BookManagement({ book }: BookManagementProps) {
           </CardContent>
         </Card>
 
-        {/* Submit Buttons */}
-        <div className="flex justify-end space-x-4 pt-6 border-t">
-          <Button
+        <div className="flex justify-between items-center pt-6 border-t">
+          {/* <Button
             type="button"
-            onClick={() => router.back()}
-            variant="outline"
-            disabled={isSubmitting}
+            onClick={handleDelete}
+            disabled={isSubmitting || isDeleting}
+            variant="destructive"
+            className="flex items-center gap-2"
           >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="min-w-32"
-          >
-            {isSubmitting ? (
+            {isDeleting ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Saving...
+                Deleting...
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
+                <Trash className="h-4 w-4 mr-2" />
+                Delete Book
               </>
             )}
-          </Button>
+          </Button> */}
+
+          <div className="flex space-x-4">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="min-w-32"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </form>
     </div>

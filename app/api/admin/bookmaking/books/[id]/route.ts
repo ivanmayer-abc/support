@@ -70,11 +70,8 @@ export async function PUT(
 
     const { id } = params
     const body = await request.json()
-    const { title, date, teams, events } = body
+    const { title, date, category, image, teams, events } = body
 
-    console.log(`🔧 [PUT] Updating book ${id} with data:`, { title, date, teamsCount: teams?.length, eventsCount: events?.length })
-
-    // Validate the book exists
     const existingBook = await db.book.findUnique({
       where: { id }
     })
@@ -86,18 +83,17 @@ export async function PUT(
       )
     }
 
-    // Start a transaction to update book, teams, and events
     const result = await db.$transaction(async (tx) => {
-      // Update the book
       const updatedBook = await tx.book.update({
         where: { id },
         data: {
           title,
           date: new Date(date),
+          category,
+          image: image || null,
         },
       })
 
-      // Delete existing teams and events (cascading should handle outcomes and bets)
       await tx.team.deleteMany({
         where: { bookId: id }
       })
@@ -106,7 +102,6 @@ export async function PUT(
         where: { bookId: id }
       })
 
-      // Create new teams
       const createdTeams = await Promise.all(
         teams.map((team: any) =>
           tx.team.create({
@@ -119,7 +114,6 @@ export async function PUT(
         )
       )
 
-      // Create new events with outcomes
       const createdEvents = await Promise.all(
         events.map((event: any) =>
           tx.event.create({
@@ -132,8 +126,8 @@ export async function PUT(
                 create: event.outcomes.map((outcome: any) => ({
                   name: outcome.name,
                   odds: outcome.odds,
-                  probability: 0, // You might want to calculate this
-                  stake: 0, // Initialize with 0
+                  probability: 1 / outcome.odds,
+                  stake: 0,
                   result: 'PENDING',
                 })),
               },
@@ -151,8 +145,6 @@ export async function PUT(
         events: createdEvents,
       }
     })
-
-    console.log(`✅ [PUT] Book ${id} updated successfully with ${result.teams.length} teams and ${result.events.length} events`)
 
     return NextResponse.json({
       success: true,
@@ -183,7 +175,6 @@ export async function PUT(
     )
   }
 }
-
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -201,9 +192,6 @@ export async function PATCH(
     const body = await request.json()
     const { status, title, date, category, image } = body
 
-    console.log(`🔧 [PATCH] Updating book ${id} with data:`, body)
-
-    // Validate the book exists
     const existingBook = await db.book.findUnique({
       where: { id }
     })
@@ -215,11 +203,9 @@ export async function PATCH(
       )
     }
 
-    // Prepare update data
     const updateData: any = {}
 
     if (status) {
-      // Validate status
       const validStatuses = ['ACTIVE', 'SETTLED', 'CANCELLED', 'COMPLETED']
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
@@ -235,7 +221,6 @@ export async function PATCH(
     if (category) updateData.category = category
     if (image !== undefined) updateData.image = image
 
-    // If no valid fields to update
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No valid fields to update' },
@@ -243,7 +228,6 @@ export async function PATCH(
       )
     }
 
-    // Update the book
     const updatedBook = await db.book.update({
       where: { id },
       data: updateData,
@@ -262,8 +246,6 @@ export async function PATCH(
         }
       }
     })
-
-    console.log(`✅ [PATCH] Book ${id} updated successfully to status: ${updatedBook.status}`)
 
     return NextResponse.json({
       success: true,
@@ -292,5 +274,35 @@ export async function PATCH(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     )
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await currentUser()
+    if (!user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const book = await db.book.findUnique({
+      where: { id: params.id },
+      include: { events: { include: { outcomes: true } }, teams: true }
+    })
+
+    if (!book) {
+      return NextResponse.json({ error: 'Book not found' }, { status: 404 })
+    }
+
+    await db.book.delete({
+      where: { id: params.id }
+    })
+
+    return NextResponse.json({ message: 'Book deleted successfully' })
+  } catch (error: any) {
+    console.error('Error deleting book:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

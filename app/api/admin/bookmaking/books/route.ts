@@ -14,8 +14,6 @@ export async function POST(req: Request) {
 
     const { title, date, events, teams, category, image } = await req.json()
 
-    console.log('📦 Received data:', { title, date, events, teams })
-
     if (!title) {
       return NextResponse.json(
         { error: 'Title is required' },
@@ -51,7 +49,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Validate fast bet selections
     const firstFastBetCount = events.filter((event: any) => event.isFirstFastOption).length
     const secondFastBetCount = events.filter((event: any) => event.isSecondFastOption).length
 
@@ -69,9 +66,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // Create the book with teams and events in a transaction
     const result = await db.$transaction(async (tx) => {
-      // 1. Create the book first
       const book = await tx.book.create({
         data: {
           title,
@@ -82,9 +77,6 @@ export async function POST(req: Request) {
         }
       })
 
-      console.log('📚 Book created:', book.id)
-
-      // 2. Create teams for this book
       const createdTeams = await Promise.all(
         teams.map((team: any) =>
           tx.team.create({
@@ -97,9 +89,6 @@ export async function POST(req: Request) {
         )
       )
 
-      console.log('🏈 Teams created:', createdTeams.length)
-
-      // 3. Create events with outcomes
       const createdEvents = await Promise.all(
         events.map(async (event: any) => {
           return tx.event.create({
@@ -123,8 +112,6 @@ export async function POST(req: Request) {
           })
         })
       )
-
-      console.log('🎯 Events created:', createdEvents.length)
 
       return {
         book,

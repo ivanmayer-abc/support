@@ -26,6 +26,12 @@ const HeaderNav = () => {
             >
                 <p>Transactions</p>
             </Link>
+            <Link
+                href="/promo"
+                className={`flex gap-2 items-center ${pathname === '/promo' ? 'text-red-600' : ''}`}
+            >
+                <p>Promo</p>
+            </Link>
         </nav>
     );
 }

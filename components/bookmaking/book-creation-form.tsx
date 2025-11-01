@@ -8,25 +8,39 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, AlertCircle, Users, Calendar } from 'lucide-react'
+import { Plus, Trash2, AlertCircle, Users, Calendar, Loader2, Zap, Search } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '@/components/ui/switch'
 
 const CATEGORIES = [
-  'Football',
-  'Basketball', 
   'Cricket',
+  'Football',
+  'Kabaddi',
   'Tennis',
-  'Baseball',
   'Hockey',
-  'Rugby',
+  'Badminton',
+  'Basketball',
   'Boxing',
   'MMA',
   'Esports',
   'Other'
 ]
+
+const SPORTS_API_MAPPING = {
+  'Cricket': 'cricket',
+  'Football': 'football',
+  'Kabaddi': 'kabaddi',
+  'Tennis': 'tennis',
+  'Hockey': 'hockey',
+  'Badminton': 'badminton',
+  'Basketball': 'basketball',
+  'Boxing': 'boxing',
+  'MMA': 'mma',
+  'Esports': 'esports'
+}
 
 interface TeamForm {
   name: string
@@ -59,6 +73,118 @@ export default function BookCreationForm() {
     }
   ])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [useAutomation, setUseAutomation] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
+  const [tournamentFilter, setTournamentFilter] = useState('')
+  const [foundEvents, setFoundEvents] = useState<any[]>([])
+  const [selectedEvent, setSelectedEvent] = useState<any>(null)
+
+  const searchAutomatedEvents = async () => {
+    if (!category) {
+      toast.error('Please select a category first')
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const sportKey = SPORTS_API_MAPPING[category as keyof typeof SPORTS_API_MAPPING] || 'soccer'
+      
+      const response = await fetch('/api/admin/bookmaking/auto-create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-search-only': 'true'
+        },
+        body: JSON.stringify({
+          sport: sportKey,
+          tournament: tournamentFilter,
+          autoCreateMultiple: false
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        setFoundEvents(data.results || [])
+        if (data.results && data.results.length > 0) {
+          toast.success(`Found ${data.results.length} real events with odds`)
+        } else {
+          toast.info('No events found. Try a different sport.')
+        }
+      } else {
+        throw new Error(data.error || 'Failed to fetch events')
+      }
+    } catch (error: any) {
+      console.error('Error:', error)
+      toast.error(error.message || 'Check your API key and try again')
+    } finally {
+      setIsSearching(false)
+    }
+  }
+  const loadEventData = (eventData: any) => {
+    setSelectedEvent(eventData)
+    
+    setTitle(eventData.title || `${eventData.homeTeam} vs ${eventData.awayTeam}`)
+    setDate(new Date(eventData.startTime).toISOString().slice(0, 16))
+    setCategory(eventData.category || category)
+    
+    setTeams([
+      { name: eventData.homeTeam, image: '' },
+      { name: eventData.awayTeam, image: '' }
+    ])
+    
+    const formattedEvents = eventData.markets.map((market: any, index: number) => ({
+      name: market.name,
+      isFirstFastOption: index === 0,
+      isSecondFastOption: index === 1,
+      outcomes: market.outcomes.map((outcome: any) => ({
+        name: outcome.name,
+        odds: outcome.odds
+      }))
+    }))
+    
+    setEvents(formattedEvents)
+    
+    toast.success('Event data loaded successfully!')
+  }
+
+  const autoCreateBook = async () => {
+    if (!selectedEvent) {
+      toast.error('Please select an event first')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const sportKey = SPORTS_API_MAPPING[category as keyof typeof SPORTS_API_MAPPING] || 'soccer'
+      
+      const response = await fetch('/api/admin/bookmaking/auto-create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sport: sportKey,
+          tournament: tournamentFilter,
+          autoCreateMultiple: false
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        toast.success('Book created automatically!')
+        router.push('/')
+      } else {
+        throw new Error(data.error || 'Failed to create book')
+      }
+    } catch (error: any) {
+      console.error('Error creating book:', error)
+      toast.error(error.message || 'Failed to create book automatically')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const addTeam = () => {
     setTeams([...teams, { name: '', image: '' }])
@@ -253,21 +379,110 @@ export default function BookCreationForm() {
 
   return (
     <div className="px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Create New Book</h1>
-        <p className="text-muted-foreground mt-2">
-          Create a betting book with teams and betting options
-        </p>
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Book Information */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Find Events Automatically
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Sport Category</Label>
+                <Select value={category} onValueChange={setCategory} disabled={isSearching}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sport" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Tournament (Optional)</Label>
+                <Input
+                  value={tournamentFilter}
+                  onChange={(e) => setTournamentFilter(e.target.value)}
+                  placeholder="e.g., Premier League, NBA"
+                  disabled={isSearching}
+                />
+              </div>
+              
+              <div className="space-y-2 flex items-end">
+                <Button
+                  type="button"
+                  onClick={searchAutomatedEvents}
+                  disabled={!category || isSearching}
+                  className="w-full"
+                >
+                  {isSearching ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Search Events
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {foundEvents.length > 0 && (
+              <div className="space-y-3">
+                <Label>Found Events</Label>
+                <div className="grid gap-2 max-h-60 overflow-y-auto">
+                  {foundEvents.map((event, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 border rounded-lg cursor-pointer hover:bg-muted/50 ${
+                        selectedEvent === event ? 'border-primary bg-primary/5' : ''
+                      }`}
+                      onClick={() => loadEventData(event)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">{event.homeTeam} vs {event.awayTeam}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {event.tournament} • {new Date(event.startTime).toLocaleDateString()}
+                          </p>
+                          <div className="flex gap-2 mt-1">
+                            {(event.markets || []).slice(0, 2).map((market: any, idx: number) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {market.name}
+                              </Badge>
+                            ))}
+                            {(event.markets || []).length === 0 && (
+                              <Badge variant="outline" className="text-xs">
+                                No markets
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Badge variant={selectedEvent === event ? "default" : "outline"}>
+                          {selectedEvent === event ? 'Selected' : 'Select'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Book Information</CardTitle>
-            <CardDescription>
-              Basic information about your betting book
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -326,7 +541,6 @@ export default function BookCreationForm() {
           </CardContent>
         </Card>
 
-        {/* Teams Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -335,9 +549,6 @@ export default function BookCreationForm() {
                   <Users className="h-5 w-5" />
                   Teams
                 </CardTitle>
-                <CardDescription>
-                  Add teams that will be available for betting
-                </CardDescription>
               </div>
               <Button
                 type="button"
@@ -410,7 +621,6 @@ export default function BookCreationForm() {
           </CardContent>
         </Card>
 
-        {/* Betting Options Section */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -419,9 +629,6 @@ export default function BookCreationForm() {
                   <Calendar className="h-5 w-5" />
                   Betting Options
                 </CardTitle>
-                <CardDescription>
-                  Create different betting options with outcomes
-                </CardDescription>
               </div>
               <Button
                 type="button"
@@ -461,7 +668,6 @@ export default function BookCreationForm() {
                     )}
                   </div>
 
-                  {/* Event Basic Info */}
                   <div className="space-y-4 mb-6">
                     <div className="space-y-2">
                       <Label htmlFor={`event-name-${eventIndex}`}>Betting Option Name *</Label>
@@ -476,7 +682,6 @@ export default function BookCreationForm() {
                     </div>
                   </div>
 
-                  {/* Fast Bet Options */}
                   <div className="mb-6 p-4 bg-muted rounded-lg">
                     <Label className="text-base font-medium mb-3 block">Fast Bet Options</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -513,12 +718,8 @@ export default function BookCreationForm() {
                         </Label>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Fast bets will be displayed prominently on the main page. Only one option can be 1st Fast Bet and one can be 2nd Fast Bet.
-                    </p>
                   </div>
 
-                  {/* Outcomes */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <Label className="text-base font-medium">Outcomes *</Label>
@@ -588,7 +789,6 @@ export default function BookCreationForm() {
           </CardContent>
         </Card>
 
-        {/* Submit Buttons */}
         <div className="flex justify-end space-x-4 pt-6 border-t">
           <Button
             type="button"
