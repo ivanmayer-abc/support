@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         ]
       },
       include: {
-        userPromoCode: {
+        userPromoCodes: {
           where: { userId: user.id }
         }
       }
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     // Check per user uses
-    const userPromoCode = promoCode.userPromoCode[0];
+    const userPromoCode = promoCode.userPromoCodes[0];
     if (promoCode.usesPerUser && userPromoCode && userPromoCode.timesUsed >= promoCode.usesPerUser) {
       return new NextResponse("You have already used this promo code", { status: 400 });
     }
