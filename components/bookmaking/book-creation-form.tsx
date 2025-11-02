@@ -122,16 +122,23 @@ export default function BookCreationForm() {
     }
   }
   const loadEventData = (eventData: any) => {
-    setSelectedEvent(eventData)
+    setSelectedEvent(eventData);
     
-    setTitle(eventData.title || `${eventData.homeTeam} vs ${eventData.awayTeam}`)
-    setDate(new Date(eventData.startTime).toISOString().slice(0, 16))
-    setCategory(eventData.category || category)
+    setTitle(eventData.title || `${eventData.homeTeam} vs ${eventData.awayTeam}`);
+    setDate(new Date(eventData.startTime).toISOString().slice(0, 16));
+    setCategory(eventData.category || category);
+    setImage(eventData.bookImage || '');
     
     setTeams([
-      { name: eventData.homeTeam, image: '' },
-      { name: eventData.awayTeam, image: '' }
-    ])
+      { 
+        name: eventData.homeTeam, 
+        image: eventData.homeTeamImage || '' 
+      },
+      { 
+        name: eventData.awayTeam, 
+        image: eventData.awayTeamImage || '' 
+      }
+    ]);
     
     const formattedEvents = eventData.markets.map((market: any, index: number) => ({
       name: market.name,
@@ -141,50 +148,12 @@ export default function BookCreationForm() {
         name: outcome.name,
         odds: outcome.odds
       }))
-    }))
+    }));
     
-    setEvents(formattedEvents)
+    setEvents(formattedEvents);
     
-    toast.success('Event data loaded successfully!')
-  }
-
-  const autoCreateBook = async () => {
-    if (!selectedEvent) {
-      toast.error('Please select an event first')
-      return
-    }
-
-    setIsSubmitting(true)
-    try {
-      const sportKey = SPORTS_API_MAPPING[category as keyof typeof SPORTS_API_MAPPING] || 'soccer'
-      
-      const response = await fetch('/api/admin/bookmaking/auto-create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sport: sportKey,
-          tournament: tournamentFilter,
-          autoCreateMultiple: false
-        }),
-      })
-
-      const data = await response.json()
-      
-      if (response.ok) {
-        toast.success('Book created automatically!')
-        router.push('/')
-      } else {
-        throw new Error(data.error || 'Failed to create book')
-      }
-    } catch (error: any) {
-      console.error('Error creating book:', error)
-      toast.error(error.message || 'Failed to create book automatically')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+    toast.success('Event data loaded successfully!');
+  };
 
   const addTeam = () => {
     setTeams([...teams, { name: '', image: '' }])
