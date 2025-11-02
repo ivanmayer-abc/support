@@ -77,9 +77,9 @@ const AdminUsersPage = () => {
   const [approvingPassport, setApprovingPassport] = useState(false);
   const router = useRouter();
 
-  const getAdminImageUrl = (filename: string) => {
-    if (!filename) return '';
-    return `/api/proxy-image?filename=${encodeURIComponent(filename)}`;
+  const getAdminImageUrl = (imageUrl: string) => {
+    if (!imageUrl) return '';
+    return `/api/proxy-image?filename=${encodeURIComponent(imageUrl)}`;
   };
 
   const getPassportStatusColor = (status: string) => {

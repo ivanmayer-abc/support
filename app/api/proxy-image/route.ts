@@ -3,24 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const filename = searchParams.get('filename');
+    const imageUrl = searchParams.get('filename');
     
-    if (!filename) {
-      return NextResponse.json({ error: 'Filename required' }, { status: 400 });
+    if (!imageUrl) {
+      return NextResponse.json({ error: 'Image URL required' }, { status: 400 });
     }
 
-    const mainAppUrl = process.env.MAIN_APP_URL || 'http://localhost:3000';
-    const adminApiKey = process.env.ADMIN_API_KEY;
-    
-    const response = await fetch(`${mainAppUrl}/api/admin/images/${encodeURIComponent(filename)}`, {
-      headers: {
-        'x-api-key': adminApiKey || ''
-      }
-    });
+    const response = await fetch(imageUrl);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch image: ${response.status} - ${errorText}`);
+      throw new Error(`Failed to fetch image: ${response.status}`);
     }
 
     const imageData = await response.blob();
