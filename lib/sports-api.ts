@@ -23,6 +23,14 @@ interface Outcome {
   odds: number;
 }
 
+interface MatchResult {
+  status: string;
+  outcomes: Array<{
+    marketName: string;
+    winningOutcome: string;
+  }>;
+}
+
 class SportsDataService {
   private apis = {
     theOddsApi: {
@@ -50,6 +58,48 @@ class SportsDataService {
     } catch (error: any) {
       throw new Error(`API Error: ${error.message}`);
     }
+  }
+
+  async getMatchResult(bookId: string, homeTeam: string, awayTeam: string, sport: string): Promise<MatchResult | null> {
+    try {
+      const mockResult = this.generateMockResult(homeTeam, awayTeam, sport);
+      return mockResult;
+    } catch (error) {
+      console.error('Error getting match result:', error);
+      return null;
+    }
+  }
+
+  private generateMockResult(homeTeam: string, awayTeam: string, sport: string): MatchResult {
+    const outcomes = [];
+    
+    const matchWinner = Math.random() > 0.5 ? homeTeam : awayTeam;
+    outcomes.push({
+      marketName: 'Match Winner',
+      winningOutcome: matchWinner
+    });
+
+    if (sport === 'soccer' || sport === 'football') {
+      const totalGoals = Math.floor(Math.random() * 5);
+      const overUnder = totalGoals > 2.5 ? 'Over' : 'Under';
+      outcomes.push({
+        marketName: 'Over/Under',
+        winningOutcome: `${overUnder} 2.5`
+      });
+    }
+
+    if (sport === 'basketball') {
+      const handicap = Math.random() > 0.5 ? homeTeam : awayTeam;
+      outcomes.push({
+        marketName: 'Handicap',
+        winningOutcome: handicap
+      });
+    }
+
+    return {
+      status: 'COMPLETED',
+      outcomes
+    };
   }
 
   private mapSportToOddsApi(sport: string): string {

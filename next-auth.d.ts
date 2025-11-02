@@ -9,7 +9,7 @@ export type ExtendedUser = DefaultSession['user'] & {
     role: UserRole
     isTwoFactorEnabled: boolean
     isOAuth: boolean
-    isImageApproved: boolean
+    isImageApproved: string
     isBlocked: boolean;
     isChatBlocked: boolean;
 }

@@ -1,4 +1,4 @@
-"use client"; 
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,13 +20,20 @@ import {
   Ban,
   MessageSquare,
   CheckCircle,
-  XCircle,
-  TrendingUp,
-  TrendingDown,
-  CreditCard
+  CreditCard,
+  Eye,
+  FileCheck,
+  FileX
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface User {
   id: string;
@@ -35,56 +42,13 @@ interface User {
   role: string;
   isBlocked: boolean;
   isChatBlocked: boolean;
+  isImageApproved: string;
   createdAt: string;
-}
-
-interface Transaction {
-  id: string;
-  type: string;
-  amount: any;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  description: string | null;
-  category: string | null;
-  userId: string;
-}
-
-interface UserBalance {
-  available: number;
-  netPending: number;
-  effective: number;
-}
-
-interface ProfitMetrics {
-  transaction: {
-    totalDeposits: number;
-    totalWithdrawals: number;
-    netProfit: number;
-    transactionCount: number;
-  };
-  game: {
-    totalDeposits: number;
-    totalWithdrawals: number;
-    netProfit: number;
-    transactionCount: number;
-  };
-  overall: {
-    totalDeposits: number;
-    totalWithdrawals: number;
-    netProfit: number;
-  };
-}
-
-interface UserDetails {
-  user: User;
-  transactions: {
-    all: Transaction[];
-    transactionCategory: Transaction[];
-    otherCategory: Transaction[];
-  };
-  balance: UserBalance;
-  profitMetrics: ProfitMetrics;
+  image?: {
+    id: string;
+    url: string;
+    createdAt: string;
+  } | null;
 }
 
 interface PaginationInfo {
@@ -108,36 +72,48 @@ const AdminUsersPage = () => {
     hasPrev: false,
   });
   const [mounted, setMounted] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [passportModalOpen, setPassportModalOpen] = useState(false);
+  const [selectedUserForPassport, setSelectedUserForPassport] = useState<User | null>(null);
+  const [approvingPassport, setApprovingPassport] = useState(false);
   const router = useRouter();
+
+  const getAdminImageUrl = (filename: string) => {
+    if (!filename) return '';
+    return `/api/proxy-image?filename=${encodeURIComponent(filename)}`;
+  };
+
+  const getPassportStatusColor = (status: string) => {
+    switch (status) {
+      case 'success': return 'text-green-600 bg-green-100';
+      case 'rejected': return 'text-red-600 bg-red-100';
+      case 'pending': return 'text-yellow-600 bg-yellow-100';
+      default: return 'text-gray-600 bg-gray-100';
+    }
+  };
+
+  const getPassportStatusText = (status: string) => {
+    switch (status) {
+      case 'success': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'pending': return 'Pending Review';
+      case 'none': return 'Not Uploaded';
+      default: return status || 'Not Uploaded';
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const updateUserStatus = async (
-    userId: string, 
-    statusType: "isBlocked" | "isChatBlocked", 
-    value: boolean
-  ) => {
+  const updateUserStatus = async (userId: string, statusType: "isBlocked" | "isChatBlocked", value: boolean) => {
     try {
       const response = await fetch('/api/users/update', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, statusType, value }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP Error: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(data.error || `HTTP Error: ${response.status}`);
       return data;
     } catch (error) {
       console.error('Failed to update user status:', error);
@@ -145,34 +121,28 @@ const AdminUsersPage = () => {
     }
   };
 
-  const fetchUserDetails = async (userId: string) => {
+  const approveUserPassport = async (userId: string, status: 'success' | 'rejected') => {
     try {
-      setLoadingDetails(true);
-      const response = await fetch(`/api/admin/users/${userId}/transactions`);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('User details not found');
-        } else if (response.status === 401) {
-          throw new Error('Unauthorized - Please login again');
-        } else {
-          throw new Error(`Failed to fetch user details: ${response.status}`);
-        }
-      }
-      
+      setApprovingPassport(true);
+      const response = await fetch('/api/admin/approve-passport', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, status }),
+      });
       const data = await response.json();
-      setSelectedUser(data);
-      setDetailsOpen(true);
+      if (!response.ok) throw new Error(data.error || `HTTP Error: ${response.status}`);
+      toast.success(`Passport ${status === 'success' ? 'approved' : 'rejected'} successfully`);
+      setUsers(prevUsers => prevUsers.map(user => user.id === userId ? { ...user, isImageApproved: status } : user));
+      setPassportModalOpen(false);
+      setSelectedUserForPassport(null);
+      return data;
     } catch (error) {
-      console.error('Error fetching user details:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Error loading user details';
+      console.error('Failed to update passport status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update passport status';
       toast.error(errorMessage);
-      
-      if (errorMessage.includes('Unauthorized')) {
-        router.push('/login');
-      }
+      throw error;
     } finally {
-      setLoadingDetails(false);
+      setApprovingPassport(false);
     }
   };
 
@@ -239,28 +209,15 @@ const AdminUsersPage = () => {
   const fetchUsers = async (page: number = 1, search: string = '') => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '10',
-        ...(search && { search })
-      });
-      
-      const response = await fetch(`/api/users?${params}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.status}`);
-      }
-      
+      const params = new URLSearchParams({ page: page.toString(), limit: '10', ...(search && { search }) });
+      const response = await fetch(`/api/admin/users?${params}`);
+      if (!response.ok) throw new Error(`Failed to fetch users: ${response.status}`);
       const data = await response.json();
       setUsers(data.users);
       setPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching users:', error);
-      alert('Error loading users. Please check if you are logged in as admin.');
-      
-      if (error instanceof Error && error.message.includes('401')) {
-        router.push('/login');
-      }
+      alert('Error loading users.');
     } finally {
       setLoading(false);
     }
@@ -280,16 +237,14 @@ const AdminUsersPage = () => {
     fetchUsers(page, searchTerm);
   };
 
+  const openPassportModal = (user: User) => {
+    setSelectedUserForPassport(user);
+    setPassportModalOpen(true);
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const handleCopy = async (userId: string) => {
-    await navigator.clipboard.writeText(userId);
-    setCopied(true);
-    toast.success("User ID copied");
-    setTimeout(() => setCopied(false), 1500);
-  };
 
   if (!mounted) {
     return (
@@ -309,7 +264,6 @@ const AdminUsersPage = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                id="search"
                 type="text"
                 placeholder="Search by name, email, ID..."
                 value={searchTerm}
@@ -317,22 +271,14 @@ const AdminUsersPage = () => {
                 className="pl-10 pr-10"
               />
               {searchTerm && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                <button type="button" onClick={clearSearch} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
           </div>
-          <Button type="submit">
-            Search
-          </Button>
-          <Button type="button" variant="outline" onClick={clearSearch}>
-            Clear
-          </Button>
+          <Button type="submit">Search</Button>
+          <Button type="button" variant="outline" onClick={clearSearch}>Clear</Button>
         </form>
       </div>
       
@@ -341,6 +287,7 @@ const AdminUsersPage = () => {
           <TableHeader>
             <TableRow>
               <TableHead className="pl-5">User</TableHead>
+              <TableHead>Passport Status</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Chat Status</TableHead>
               <TableHead>Actions</TableHead>
@@ -349,7 +296,7 @@ const AdminUsersPage = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell colSpan={5} className="text-center py-8">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                   </div>
@@ -357,7 +304,7 @@ const AdminUsersPage = () => {
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                   No users found.
                 </TableCell>
               </TableRow>
@@ -366,19 +313,20 @@ const AdminUsersPage = () => {
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex flex-col pl-3">
-                      <div className="font-medium text-lg">
-                        {user.name || "Unnamed User"} 
-                        <span
-                          className="text-xs text-gray-300 mt-1 ml-1 cursor-pointer"
-                          onClick={() => handleCopy(user.id)}
-                          title="Click to copy user ID"
-                        >
-                          {user.id}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        {user.email}
-                      </div>
+                      <div className="font-medium text-lg">{user.name || "Unnamed User"}</div>
+                      <div className="text-sm text-gray-400">{user.email}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPassportStatusColor(user.isImageApproved)}`}>
+                        {getPassportStatusText(user.isImageApproved)}
+                      </span>
+                      {user.image && user.image.url && (
+                        <Button variant="outline" size="sm" onClick={() => openPassportModal(user)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -429,21 +377,13 @@ const AdminUsersPage = () => {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                      >
+                      <Button asChild variant="outline" size="sm">
                         <Link href={`/users/${user.id}/transactions`}>
                           <CreditCard className="h-4 w-4 mr-1" />
                           Transactions
                         </Link>
                       </Button>
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                      >
+                      <Button asChild variant="outline" size="sm">
                         <Link href={`/users/${user.id}/conversations`}>
                           <MessageSquare className="h-4 w-4 mr-1" />
                           Chats
@@ -460,53 +400,28 @@ const AdminUsersPage = () => {
         {!loading && users.length > 0 && (
           <div className="flex items-center justify-between px-6 py-4 border-t">
             <div className="text-sm text-gray-700">
-              Showing {(pagination.currentPage - 1) * 10 + 1} to{" "}
-              {Math.min(pagination.currentPage * 10, pagination.totalCount)} of{" "}
-              {pagination.totalCount} users
+              Showing {(pagination.currentPage - 1) * 10 + 1} to {Math.min(pagination.currentPage * 10, pagination.totalCount)} of {pagination.totalCount} users
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => goToPage(pagination.currentPage - 1)}
-                disabled={!pagination.hasPrev}
-              >
+              <Button variant="outline" size="sm" onClick={() => goToPage(pagination.currentPage - 1)} disabled={!pagination.hasPrev}>
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
-              
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                   let pageNum: number;
-                  if (pagination.totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (pagination.currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (pagination.currentPage >= pagination.totalPages - 2) {
-                    pageNum = pagination.totalPages - 4 + i;
-                  } else {
-                    pageNum = pagination.currentPage - 2 + i;
-                  }
-                  
+                  if (pagination.totalPages <= 5) pageNum = i + 1;
+                  else if (pagination.currentPage <= 3) pageNum = i + 1;
+                  else if (pagination.currentPage >= pagination.totalPages - 2) pageNum = pagination.totalPages - 4 + i;
+                  else pageNum = pagination.currentPage - 2 + i;
                   return (
-                    <Button
-                      key={pageNum}
-                      variant={pagination.currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => goToPage(pageNum)}
-                    >
+                    <Button key={pageNum} variant={pagination.currentPage === pageNum ? "default" : "outline"} size="sm" onClick={() => goToPage(pageNum)}>
                       {pageNum}
                     </Button>
                   );
                 })}
               </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => goToPage(pagination.currentPage + 1)}
-                disabled={!pagination.hasNext}
-              >
+              <Button variant="outline" size="sm" onClick={() => goToPage(pagination.currentPage + 1)} disabled={!pagination.hasNext}>
                 Next
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -514,6 +429,65 @@ const AdminUsersPage = () => {
           </div>
         )}
       </div>
+
+      <Dialog open={passportModalOpen} onOpenChange={setPassportModalOpen}>
+        <DialogContent className="max-w-4xl bg-black">
+          <DialogHeader>
+            <DialogTitle>Passport Verification</DialogTitle>
+            <DialogDescription>Review and verify the passport/document for {selectedUserForPassport?.name || selectedUserForPassport?.email}</DialogDescription>
+          </DialogHeader>
+          {selectedUserForPassport && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold mb-2">User Information</h4>
+                  <div className="space-y-1 text-sm">
+                    <p><strong>Name:</strong> {selectedUserForPassport.name || 'Not provided'}</p>
+                    <p><strong>Email:</strong> {selectedUserForPassport.email}</p>
+                    <p><strong>User ID:</strong> {selectedUserForPassport.id}</p>
+                    <p><strong>Current Status:</strong> 
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getPassportStatusColor(selectedUserForPassport.isImageApproved)}`}>
+                        {getPassportStatusText(selectedUserForPassport.isImageApproved)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-semibold mb-2">Verification Actions</h4>
+                  <div className="space-y-2">
+                    <Button onClick={() => approveUserPassport(selectedUserForPassport.id, 'success')} disabled={approvingPassport || selectedUserForPassport.isImageApproved === 'success'} className="w-full bg-green-600 hover:bg-green-700">
+                      <FileCheck className="h-4 w-4 mr-2" />
+                      Approve Passport
+                    </Button>
+                    <Button onClick={() => approveUserPassport(selectedUserForPassport.id, 'rejected')} disabled={approvingPassport || selectedUserForPassport.isImageApproved === 'rejected'} variant="destructive" className="w-full">
+                      <FileX className="h-4 w-4 mr-2" />
+                      Reject Passport
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              {selectedUserForPassport.image && selectedUserForPassport.image.url ? (
+                <div>
+                  <h4 className="font-semibold mb-3">Uploaded Document</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <img 
+                      src={getAdminImageUrl(selectedUserForPassport.image.url)} 
+                      alt="Passport document"
+                      className="w-full h-auto max-h-96 object-contain"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Uploaded on: {new Date(selectedUserForPassport.image.createdAt).toLocaleDateString()}</p>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <FileX className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p>No document uploaded by user</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

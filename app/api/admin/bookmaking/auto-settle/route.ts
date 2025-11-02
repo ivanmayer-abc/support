@@ -9,7 +9,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Trigger auto-settlement check
     await autoSettlementService.checkAndSettleCompletedBooks();
 
     return NextResponse.json({
@@ -18,7 +17,6 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Error in auto-settlement:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -30,7 +28,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Return status of auto-settlement service
     return NextResponse.json({
       success: true,
       message: 'Auto-settlement service is running',
@@ -38,7 +35,6 @@ export async function GET(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Error checking auto-settlement:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

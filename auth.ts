@@ -30,7 +30,7 @@ export const {
     async signIn({ user, account }) {
       if (account?.provider !== 'credentials') return true
 
-      const existingUser = await getUserById(user.id)
+      const existingUser = await getUserById(user.id!)
 
       if (!existingUser?.emailVerified) return false
 
@@ -60,8 +60,8 @@ export const {
       }
 
       if (session.user) {
-        session.user.name = token.name;
-        session.user.email = token.email;
+        session.user.name = token.name || '';
+        session.user.email = token.email || '';
         session.user.isOAuth = token.isOAuth as boolean;
       }
 
@@ -75,6 +75,10 @@ export const {
       if (session.user) {
         session.user.isChatBlocked = token.isChatBlocked as boolean;
         session.user.isBlocked = token.isBlocked as boolean;
+      }
+
+      if (session.user) {
+        session.user.isImageApproved = token.isImageApproved as string;
       }
 
       return session;
@@ -102,6 +106,7 @@ export const {
       token.isTwoFactorEnabled = existingUser.isTwoFactorEnabled
       token.isBlocked = existingUser.isBlocked
       token.isChatBlocked = existingUser.isChatBlocked
+      token.isImageApproved = existingUser.isImageApproved
 
       return token
     },
