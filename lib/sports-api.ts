@@ -151,7 +151,7 @@ class SportsDataService {
             
             const marginedOutcomes = market.outcomes.map((outcome: any) => {
               const trueOdds = outcome.price;
-              const marginedOdds = trueOdds * 0.90;
+              const marginedOdds = trueOdds * 0.95;
               
               return {
                 name: outcome.name,
