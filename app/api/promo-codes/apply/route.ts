@@ -13,7 +13,6 @@ export async function POST(req: Request) {
       return new NextResponse("Promo code is required", { status: 400 });
     }
 
-    // Check if user already has a promo code
     const existingUserPromoCode = await db.userPromoCode.findFirst({
       where: { userId: user.id },
       include: { promoCode: true }
@@ -23,9 +22,7 @@ export async function POST(req: Request) {
       return new NextResponse("You have already used a promo code on this account", { status: 400 });
     }
 
-    // Start transaction
     const result = await db.$transaction(async (tx) => {
-      // Validate and lock promo code
       const promoCode = await tx.promoCode.findFirst({
         where: {
           code: code.toUpperCase(),
@@ -42,7 +39,6 @@ export async function POST(req: Request) {
         throw new Error("Invalid or expired promo code");
       }
 
-      // Check if promo code is one-time use and user already used it
       if (promoCode.isOneTimeUse) {
         const userUsed = await tx.userPromoCode.findFirst({
           where: { userId: user.id, promoCodeId: promoCode.id }
@@ -52,12 +48,10 @@ export async function POST(req: Request) {
         }
       }
 
-      // Check max uses
       if (promoCode.maxUses && promoCode.currentUses >= promoCode.maxUses) {
         throw new Error("Promo code has reached maximum uses");
       }
 
-      // Create user promo code record
       const userPromoCode = await tx.userPromoCode.create({
         data: {
           userId: user.id,
@@ -67,13 +61,11 @@ export async function POST(req: Request) {
         }
       });
 
-      // Update promo code uses
       await tx.promoCode.update({
         where: { id: promoCode.id },
         data: { currentUses: { increment: 1 } }
       });
 
-      // Create bonus record based on promo code type
       let bonusData: any = {
         userId: user.id,
         promoCodeId: promoCode.id,
@@ -82,7 +74,7 @@ export async function POST(req: Request) {
         remainingAmount: 0,
         wageringRequirement: 0,
         type: promoCode.type,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       };
 
       switch (promoCode.type) {
@@ -96,7 +88,6 @@ export async function POST(req: Request) {
           };
           break;
         case 'DEPOSIT_BONUS':
-          // This will be applied when user makes a deposit
           break;
       }
 
