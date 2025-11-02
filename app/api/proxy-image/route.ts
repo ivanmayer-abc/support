@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const mainAppUrl = process.env.MAIN_APP_URL || 'http://localhost:3000';
     const adminApiKey = process.env.ADMIN_API_KEY;
     
-    const response = await fetch(`${mainAppUrl}/api/admin/images/${filename}`, {
+    const response = await fetch(`${mainAppUrl}/api/admin/images/${encodeURIComponent(filename)}`, {
       headers: {
         'x-api-key': adminApiKey || ''
       }
