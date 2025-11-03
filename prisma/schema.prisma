@@ -139,7 +139,8 @@ model Transaction {
   history     TransactionHistory[]
   bets        Bet[]
 
-  bonus Bonus?
+  bonus       Bonus?               @relation(fields: [bonusId], references: [id])
+  bonusId     String?              @unique
 
   userId            String
   user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -225,6 +226,10 @@ model Book {
   date        DateTime
   category    String
   image       String?
+  championship    String?
+  country         String?
+  isHotEvent      Boolean  @default(false)
+  isNationalSport Boolean  @default(false)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -271,6 +276,7 @@ model Outcome {
   probability Float
   stake       Float          @default(0)
   result      OutcomeResult? @default(PENDING)
+  order       Int            @default(0)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -419,45 +425,36 @@ model UserPromoCode {
 }
 
 model Bonus {
-  id String @id @default(uuid())
+  id                    String        @id @default(uuid())
+  amount                Decimal
+  bonusAmount           Decimal
+  remainingAmount       Decimal
+  wageringRequirement   Int
+  completedWagering     Decimal       @default(0)
+  totalWagered          Decimal       @default(0)
+  withdrawnAmount       Decimal       @default(0)
+  
+  type                  PromoCodeType
+  status                BonusStatus   @default(PENDING_ACTIVATION)
 
-  amount              Decimal
-  bonusAmount         Decimal
-  remainingAmount     Decimal
-  wageringRequirement Int
-  completedWagering   Decimal @default(0)
+  transaction           Transaction?
+  
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  promoCodeId           String?
+  promoCode             PromoCode?    @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
 
-  bonusPercentage  Int?
-  maxBonusAmount   Decimal?
-  minDepositAmount Decimal?
-
-  type   PromoCodeType
-  status BonusStatus   @default(PENDING_WAGERING)
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  promoCodeId String?
-  promoCode   PromoCode? @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
-
-  transactionId String?      @unique
-  transaction   Transaction? @relation(fields: [transactionId], references: [id])
-
-  freeSpinsCount    Int?
-  freeSpinsUsed     Int?     @default(0)
-  freeSpinsGame     String?
-  freeSpinsWinnings Decimal? @default(0)
-
-  cashbackPercentage Int?
-
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  completedAt DateTime?
-
-  @@index([userId])
-  @@index([status])
-  @@index([promoCodeId])
+  freeSpinsCount        Int?
+  freeSpinsUsed         Int?          @default(0)
+  freeSpinsGame         String?
+  freeSpinsWinnings     Decimal?      @default(0)
+  cashbackPercentage    Int?
+  
+  expiresAt             DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  activatedAt           DateTime?
 }
 
 model InfluencerEarning {

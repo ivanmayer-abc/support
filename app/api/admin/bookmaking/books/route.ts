@@ -12,7 +12,19 @@ export async function POST(req: Request) {
       )
     }
 
-    const { title, date, events, teams, category, image } = await req.json()
+    const { 
+      title, 
+      date, 
+      events, 
+      teams, 
+      category, 
+      image,
+      description,
+      championship,
+      country,
+      isHotEvent,
+      isNationalSport
+    } = await req.json()
 
     if (!title) {
       return NextResponse.json(
@@ -73,6 +85,11 @@ export async function POST(req: Request) {
           date: new Date(date),
           category,
           image: image || null,
+          description: description || null,
+          championship: championship || null,
+          country: country || null,
+          isHotEvent: isHotEvent || false,
+          isNationalSport: isNationalSport || false,
           userId: user.id,
         }
       })
@@ -98,11 +115,12 @@ export async function POST(req: Request) {
               isSecondFastOption: event.isSecondFastOption || false,
               bookId: book.id,
               outcomes: {
-                create: event.outcomes.map((outcome: any) => ({
+                create: event.outcomes.map((outcome: any, index: number) => ({
                   name: outcome.name,
                   odds: parseFloat(outcome.odds) || 1.0,
                   probability: 1 / (parseFloat(outcome.odds) || 1.0),
-                  stake: 0
+                  stake: 0,
+                  order: outcome.order !== undefined ? outcome.order : index
                 }))
               }
             },
@@ -148,7 +166,11 @@ export async function GET() {
         teams: true,
         events: {
           include: {
-            outcomes: true,
+            outcomes: {
+              orderBy: {
+                order: 'asc'
+              }
+            },
             bets: {
               select: {
                 id: true,

@@ -1,4 +1,3 @@
-// src/app/api/admin/bookmaking/outcomes/[id]/result/route.ts
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { currentUser } from '@/lib/auth'
@@ -17,19 +16,17 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     const { id: outcomeId } = params
     const { result } = await req.json()
 
-    // Validate result
     const validResults = ['WIN', 'LOSE', 'VOID', 'PENDING']
     if (!validResults.includes(result)) {
       return new NextResponse("Invalid result", { status: 400 })
     }
 
-    // Verify the outcome exists and user has permission
     const outcome = await db.outcome.findFirst({
       where: {
         id: outcomeId,
         event: {
           book: {
-            userId: user.id // Ensure user owns the book
+            userId: user.id
           }
         }
       },
@@ -46,7 +43,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       return new NextResponse("Outcome not found", { status: 404 })
     }
 
-    // Update the outcome result
     const updatedOutcome = await db.outcome.update({
       where: { id: outcomeId },
       data: { result }

@@ -18,7 +18,11 @@ export async function GET(
         teams: true,
         events: {
           include: {
-            outcomes: true,
+            outcomes: {
+              orderBy: {
+                order: 'asc'
+              }
+            },
             bets: {
               select: {
                 id: true,
@@ -70,7 +74,19 @@ export async function PUT(
 
     const { id } = params
     const body = await request.json()
-    const { title, date, category, image, teams, events } = body
+    const { 
+      title, 
+      description,
+      date, 
+      category, 
+      image, 
+      championship,
+      country,
+      isHotEvent,
+      isNationalSport,
+      teams, 
+      events 
+    } = body
 
     const existingBook = await db.book.findUnique({
       where: { id }
@@ -83,14 +99,71 @@ export async function PUT(
       )
     }
 
+    if (!title?.trim()) {
+      return NextResponse.json(
+        { error: 'Title is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!date) {
+      return NextResponse.json(
+        { error: 'Date is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!teams || teams.length < 2) {
+      return NextResponse.json(
+        { error: 'At least 2 teams are required' },
+        { status: 400 }
+      )
+    }
+
+    if (!events || events.length === 0) {
+      return NextResponse.json(
+        { error: 'At least one event is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!category?.trim()) {
+      return NextResponse.json(
+        { error: 'Category is required' },
+        { status: 400 }
+      )
+    }
+
+    const firstFastBetCount = events.filter((event: any) => event.isFirstFastOption).length
+    const secondFastBetCount = events.filter((event: any) => event.isSecondFastOption).length
+
+    if (firstFastBetCount > 1) {
+      return NextResponse.json(
+        { error: 'Only one event can be selected as 1st Fast Bet' },
+        { status: 400 }
+      )
+    }
+
+    if (secondFastBetCount > 1) {
+      return NextResponse.json(
+        { error: 'Only one event can be selected as 2nd Fast Bet' },
+        { status: 400 }
+      )
+    }
+
     const result = await db.$transaction(async (tx) => {
       const updatedBook = await tx.book.update({
         where: { id },
         data: {
-          title,
+          title: title.trim(),
+          description: description?.trim() || null,
           date: new Date(date),
-          category,
-          image: image || null,
+          category: category.trim(),
+          image: image?.trim() || null,
+          championship: championship?.trim() || null,
+          country: country?.trim() || null,
+          isHotEvent: Boolean(isHotEvent),
+          isNationalSport: Boolean(isNationalSport),
         },
       })
 
@@ -106,8 +179,8 @@ export async function PUT(
         teams.map((team: any) =>
           tx.team.create({
             data: {
-              name: team.name,
-              image: team.image || null,
+              name: team.name.trim(),
+              image: team.image?.trim() || null,
               bookId: id,
             },
           })
@@ -115,20 +188,21 @@ export async function PUT(
       )
 
       const createdEvents = await Promise.all(
-        events.map((event: any) =>
+        events.map((event: any, index: number) =>
           tx.event.create({
             data: {
-              name: event.name,
-              isFirstFastOption: event.isFirstFastOption,
-              isSecondFastOption: event.isSecondFastOption,
+              name: event.name.trim(),
+              isFirstFastOption: Boolean(event.isFirstFastOption),
+              isSecondFastOption: Boolean(event.isSecondFastOption),
               bookId: id,
               outcomes: {
-                create: event.outcomes.map((outcome: any) => ({
-                  name: outcome.name,
-                  odds: outcome.odds,
-                  probability: 1 / outcome.odds,
+                create: event.outcomes.map((outcome: any, outcomeIndex: number) => ({
+                  name: outcome.name.trim(),
+                  odds: parseFloat(outcome.odds) || 1.0,
+                  probability: 1 / (parseFloat(outcome.odds) || 1.0),
                   stake: 0,
                   result: 'PENDING',
+                  order: outcome.order !== undefined ? outcome.order : outcomeIndex
                 })),
               },
             },
@@ -175,6 +249,7 @@ export async function PUT(
     )
   }
 }
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -190,7 +265,18 @@ export async function PATCH(
 
     const { id } = params
     const body = await request.json()
-    const { status, title, date, category, image } = body
+    const { 
+      status, 
+      title, 
+      description,
+      date, 
+      category, 
+      image,
+      championship,
+      country,
+      isHotEvent,
+      isNationalSport
+    } = body
 
     const existingBook = await db.book.findUnique({
       where: { id }
@@ -216,10 +302,15 @@ export async function PATCH(
       updateData.status = status
     }
 
-    if (title) updateData.title = title
+    if (title !== undefined) updateData.title = title.trim()
+    if (description !== undefined) updateData.description = description?.trim() || null
     if (date) updateData.date = new Date(date)
-    if (category) updateData.category = category
-    if (image !== undefined) updateData.image = image
+    if (category !== undefined) updateData.category = category.trim()
+    if (image !== undefined) updateData.image = image?.trim() || null
+    if (championship !== undefined) updateData.championship = championship?.trim() || null
+    if (country !== undefined) updateData.country = country?.trim() || null
+    if (isHotEvent !== undefined) updateData.isHotEvent = Boolean(isHotEvent)
+    if (isNationalSport !== undefined) updateData.isNationalSport = Boolean(isNationalSport)
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
@@ -235,7 +326,11 @@ export async function PATCH(
         teams: true,
         events: {
           include: {
-            outcomes: true,
+            outcomes: {
+              orderBy: {
+                order: 'asc'
+              }
+            },
             bets: {
               select: {
                 id: true,
@@ -289,7 +384,14 @@ export async function DELETE(
 
     const book = await db.book.findUnique({
       where: { id: params.id },
-      include: { events: { include: { outcomes: true } }, teams: true }
+      include: { 
+        events: { 
+          include: { 
+            outcomes: true 
+          } 
+        }, 
+        teams: true 
+      }
     })
 
     if (!book) {
@@ -300,9 +402,14 @@ export async function DELETE(
       where: { id: params.id }
     })
 
-    return NextResponse.json({ message: 'Book deleted successfully' })
+    return NextResponse.json({ 
+      success: true,
+      message: 'Book deleted successfully' 
+    })
   } catch (error: any) {
     console.error('Error deleting book:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ 
+      error: error.message || 'Internal server error' 
+    }, { status: 500 })
   }
 }
