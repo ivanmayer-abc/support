@@ -112,7 +112,6 @@ export default function BookSettlementDialog({
 
       if (response.ok) {
         const result = await response.json()
-        console.log('Settlement result:', result.data)
         setSettledEvents(prev => new Set(prev).add(eventId))
         return true
       } else {
@@ -138,16 +137,12 @@ export default function BookSettlementDialog({
     setSettling(true)
 
     try {
-      // Settle events one by one to handle errors gracefully
       for (const event of pendingEvents) {
         if (!settledEvents.has(event.id)) {
-          console.log(`Settling event: ${event.name}`)
           await settleEvent(event.id)
         }
       }
 
-      // Update book status to SETTLED
-      console.log(`📚 Updating book ${book.id} status to SETTLED`)
       const updateResponse = await fetch(`/api/admin/bookmaking/books/${book.id}`, {
         method: 'PATCH',
         headers: {
@@ -156,11 +151,8 @@ export default function BookSettlementDialog({
         body: JSON.stringify({ status: 'SETTLED' }),
       })
 
-      console.log('Book update response status:', updateResponse.status)
-      
       if (updateResponse.ok) {
         const updateResult = await updateResponse.json()
-        console.log('Book update result:', updateResult)
       } else {
         const error = await updateResponse.text()
         console.error('Book update failed:', error)
@@ -188,7 +180,7 @@ export default function BookSettlementDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-black">
         <DialogHeader>
           <DialogTitle>Settle Book: {currentBook.title}</DialogTitle>
           <DialogDescription>
@@ -200,7 +192,6 @@ export default function BookSettlementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Book Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{pendingEvents.length}</div>
@@ -216,7 +207,6 @@ export default function BookSettlementDialog({
           </div>
         </div>
 
-        {/* Events List */}
         <div className="space-y-6">
           {pendingEvents.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -250,7 +240,6 @@ export default function BookSettlementDialog({
                   </div>
                 </div>
 
-                {/* Outcomes Grid */}
                 {event.outcomes && event.outcomes.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {event.outcomes.map((outcome) => (
@@ -309,7 +298,6 @@ export default function BookSettlementDialog({
                   </div>
                 )}
 
-                {/* Event Status */}
                 {!winningOutcomes[event.id] && !settledEvents.has(event.id) && (
                   <div className="mt-3 text-sm text-yellow-600">
                     ⚠️ Please select a winning outcome for this event
@@ -320,7 +308,6 @@ export default function BookSettlementDialog({
           )}
         </div>
 
-        {/* Action Buttons */}
         <div className="flex justify-between items-center pt-4 border-t">
           <div className="text-sm text-muted-foreground">
             {Object.keys(winningOutcomes).length} of {pendingEvents.length} events ready for settlement
