@@ -134,7 +134,7 @@ export default async function ManageBookPage({ params }: ManageBookPageProps) {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Book Not Found</h1>
-          <p className="text-muted-foreground">The book you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground">The book you&apos;re looking for doesn&apos;t exist.</p>
         </div>
       </div>
     )
