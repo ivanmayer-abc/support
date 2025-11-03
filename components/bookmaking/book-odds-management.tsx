@@ -253,8 +253,8 @@ export default function BookOddsManagement() {
                           </div>
                           {outcome.result && (
                             <div className={`text-xs font-medium px-2 py-1 rounded inline-block mt-1 ${
-                              outcome.result === 'WIN' ? 'bg-green-100 text-green-800' :
-                              outcome.result === 'LOSE' ? 'bg-red-100 text-red-800' :
+                              outcome.result === 'WON' ? 'bg-green-100 text-green-800' :
+                              outcome.result === 'LOST' ? 'bg-red-100 text-red-800' :
                               'bg-yellow-100 text-yellow-800'
                             }`}>
                               Result: {outcome.result}
