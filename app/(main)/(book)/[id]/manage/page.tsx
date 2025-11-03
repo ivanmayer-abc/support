@@ -1,99 +1,144 @@
-// app/[id]/manage/page.tsx
-import { notFound } from 'next/navigation'
+import BookManagement from '@/components/bookmaking/book-management'
 import { db } from '@/lib/db'
 import { currentUser } from '@/lib/auth'
-import BookManagement from '@/components/bookmaking/book-management'
+import { Book, Event, Outcome, Team } from '@/app/types/bookmaking'
 
-interface PageProps {
-  params: {
-    id: string
+function convertBookStatus(status: any): 'ACTIVE' | 'INACTIVE' | 'COMPLETED' {
+  const statusMap: { [key: string]: 'ACTIVE' | 'INACTIVE' | 'COMPLETED' } = {
+    'ACTIVE': 'ACTIVE',
+    'INACTIVE': 'INACTIVE', 
+    'COMPLETED': 'COMPLETED',
+    'SETTLED': 'COMPLETED'
+  }
+  
+  return statusMap[status] || 'INACTIVE'
+}
+
+async function getBookData(id: string) {
+  try {
+    const book = await db.book.findUnique({
+      where: { id },
+      include: {
+        teams: true,
+        events: {
+          include: {
+            outcomes: {
+              orderBy: {
+                order: 'asc'
+              }
+            },
+            bets: {
+              select: {
+                id: true,
+                status: true,
+                amount: true,
+                potentialWin: true
+              }
+            }
+          }
+        },
+        bets: {
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            potentialWin: true,
+            createdAt: true
+          }
+        }
+      }
+    })
+
+    if (!book) {
+      return null
+    }
+
+    const now = new Date()
+    const bookDate = new Date(book.date)
+    
+    const convertedStatus = convertBookStatus(book.status)
+    const isLive = convertedStatus === 'ACTIVE' && now >= bookDate
+    const isUpcoming = convertedStatus === 'ACTIVE' && now < bookDate
+    
+    const serializedBook: Book = {
+      ...book,
+      status: convertedStatus,
+      date: book.date.toISOString(),
+      createdAt: book.createdAt.toISOString(),
+      updatedAt: book.updatedAt.toISOString(),
+      isLive,
+      isUpcoming,
+      isAcceptingBets: now < bookDate,
+      displayStatus: convertedStatus === 'ACTIVE' 
+        ? (now >= bookDate ? 'LIVE' : 'UPCOMING')
+        : convertedStatus
+    } as unknown as Book
+
+    if (book.teams) {
+      serializedBook.teams = book.teams.map(team => ({
+        ...team,
+        createdAt: team.createdAt.toISOString(),
+        updatedAt: team.updatedAt.toISOString()
+      } as unknown as Team))
+    }
+
+    if (book.events) {
+      serializedBook.events = book.events.map(event => {
+        const serializedEvent = {
+          ...event,
+          createdAt: event.createdAt.toISOString(),
+          updatedAt: event.updatedAt.toISOString()
+        } as unknown as Event
+
+        if (event.outcomes) {
+          serializedEvent.outcomes = event.outcomes.map(outcome => ({
+            ...outcome,
+            createdAt: outcome.createdAt.toISOString(),
+            updatedAt: outcome.updatedAt.toISOString()
+          } as unknown as Outcome))
+        }
+
+        return serializedEvent
+      })
+    }
+
+    return serializedBook
+  } catch (error) {
+    console.error('Error fetching book:', error)
+    return null
   }
 }
 
-export default async function ManageBookPage({ params }: PageProps) {
+interface ManageBookPageProps {
+  params: { id: string }
+}
+
+export default async function ManageBookPage({ params }: ManageBookPageProps) {
   const user = await currentUser()
   
   if (!user?.id) {
-    notFound()
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Unauthorized</h1>
+          <p className="text-muted-foreground">Please sign in to manage books.</p>
+        </div>
+      </div>
+    )
   }
 
-  const book = await db.book.findUnique({
-    where: {
-      id: params.id,
-      userId: user.id
-    },
-    include: {
-      teams: true,
-      events: {
-        include: {
-          outcomes: true,
-          homeTeam: true,
-          awayTeam: true,
-          bets: {
-            select: {
-              id: true,
-              status: true
-            }
-          }
-        }
-      },
-      bets: {
-        select: {
-          id: true,
-          status: true
-        }
-      }
-    }
-  })
+  const book = await getBookData(params.id)
 
   if (!book) {
-    notFound()
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Book Not Found</h1>
+          <p className="text-muted-foreground">The book you're looking for doesn't exist.</p>
+        </div>
+      </div>
+    )
   }
 
-  // Transform the book data to match the Book type
-  const bookData = {
-    ...book,
-    description: book.description || undefined,
-    image: book.image || undefined,
-    teams: book.teams.map(team => ({
-      id: team.id,
-      name: team.name,
-      image: team.image || undefined,
-      bookId: team.bookId || undefined
-    })),
-    events: book.events.map(event => ({
-      id: event.id,
-      name: event.name,
-      description: event.description || undefined,
-      isFirstFastOption: event.isFirstFastOption,
-      isSecondFastOption: event.isSecondFastOption,
-      homeTeam: event.homeTeam ? {
-        id: event.homeTeam.id,
-        name: event.homeTeam.name,
-        image: event.homeTeam.image || undefined,
-        bookId: event.homeTeam.bookId || undefined
-      } : undefined,
-      awayTeam: event.awayTeam ? {
-        id: event.awayTeam.id,
-        name: event.awayTeam.name,
-        image: event.awayTeam.image || undefined,
-        bookId: event.awayTeam.bookId || undefined
-      } : undefined,
-      homeTeamId: event.homeTeamId || undefined,
-      awayTeamId: event.awayTeamId || undefined,
-      bookId: event.bookId,
-      outcomes: event.outcomes.map(outcome => ({
-        id: outcome.id,
-        name: outcome.name,
-        odds: outcome.odds,
-        probability: outcome.probability,
-        stake: outcome.stake,
-        result: outcome.result || 'PENDING',
-        eventId: outcome.eventId
-      })),
-      createdAt: event.createdAt
-    }))
-  }
-
-  return <BookManagement book={bookData} />
+  return <BookManagement book={book} />
 }
