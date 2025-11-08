@@ -388,7 +388,7 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
           </Button>
           <h1 className="text-2xl font-bold">User Transactions</h1>
         </div>
-        <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
+        <div className="bg-black rounded-lg border p-8 text-center text-gray-500">
           <IndianRupee className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <p className="text-lg">Error loading transactions.</p>
         </div>
@@ -415,7 +415,7 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
             </p>
           </div>
         </div>
-        <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
+        <div className="bg-black rounded-lg border p-8 text-center text-gray-500">
           <IndianRupee className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <p className="text-lg">No transactions found for this user.</p>
         </div>

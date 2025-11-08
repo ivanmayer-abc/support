@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
 
     const baseWhere = {
       OR: [
-        { description: { contains: 'deposit', mode: 'insensitive' as const } },
-        { description: { contains: 'withdrawal', mode: 'insensitive' as const } },
+        // { description: { contains: 'deposit', mode: 'insensitive' as const } },
+        // { description: { contains: 'withdrawal', mode: 'insensitive' as const } },
         { category: 'transaction' }
       ]
     };

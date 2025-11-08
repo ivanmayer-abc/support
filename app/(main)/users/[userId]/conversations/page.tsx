@@ -28,14 +28,14 @@ const UserConversationsPage = async ({ params }: UserConversationsPageProps) => 
       <div className="p-6 max-w-6xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <Button asChild variant="outline" size="sm">
-            <Link href="/admin/users">
+            <Link href="/users">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Users
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">User Conversations</h1>
         </div>
-        <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
+        <div className="bg-black rounded-lg border p-8 text-center text-gray-500">
           <MessageSquare className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <p className="text-lg">No conversations found for this user.</p>
         </div>

@@ -23,7 +23,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
         style: {
-          background: theme === "dark" ? "#000000" : "#ffffff",
+          background: "#000000",
           opacity: 1,
         },
       }}

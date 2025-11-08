@@ -358,7 +358,7 @@ const AdminUsersPage = () => {
                       disabled={updating === `chat-${user.id}`}
                       variant={user.isChatBlocked ? "default" : "outline"}
                       size="sm"
-                      className={user.isChatBlocked ? "bg-green-600 hover:bg-green-700 text-white" : "border-yellow-500 text-yellow-600 hover:bg-yellow-50"}
+                      className={user.isChatBlocked ? "bg-green-600 hover:bg-green-700 text-white" : "border-yellow-500 text-yellow-600 hover:bg-yellow-800"}
                     >
                       {updating === `chat-${user.id}` ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
