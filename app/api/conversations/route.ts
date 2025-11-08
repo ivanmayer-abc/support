@@ -15,7 +15,6 @@ export async function POST(
     }
 
     const body = await req.json();
-
     const { topic } = body;
 
     const conversation = await db.conversation.create({
@@ -36,9 +35,39 @@ export async function GET(
   req: Request,
 ) {
   try {
+    const user = await currentUser();
+    if (!user?.id) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const conversations = await db.conversation.findMany({
+      where: {
+        userId: user.id,
+      },
       include: {
-        messages: true,
+        messages: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          select: {
+            id: true,
+            body: true,
+            createdAt: true,
+            isReadByAdmin: true,
+            isReadByUser: true,
+            userId: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      },
+      orderBy: {
+        lastMessageAt: 'desc'
       }
     });
   

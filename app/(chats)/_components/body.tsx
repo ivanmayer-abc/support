@@ -15,7 +15,7 @@ interface BodyProps {
 }
 
 const Body: React.FC<BodyProps> = ({ initialMessages }) => {
-    const [messages, setMessages] = useState(initialMessages);
+        const [messages, setMessages] = useState(initialMessages);
     const bottomRef = useRef<HTMLDivElement>(null);
     const { supportId } = useConversation();
     const session = useSession();
@@ -23,46 +23,35 @@ const Body: React.FC<BodyProps> = ({ initialMessages }) => {
     const router = useRouter();
 
     useEffect(() => {
-        pusherClient.subscribe(supportId);
-        const messageHandler = (message: FullMessageType) => {
-            
-            if (!message?.id || !message?.sender) {
-                const currentDate = new Date();
-                message.sender = {
-                    id: user?.id || "unknown-user",
-                    name: user?.name || null,
-                    email: user?.email || null,
-                    emailVerified: null,
-                    image: null,
-                    password: null,
-                    role: "USER",
-                    isTwoFactorEnabled: false,
-                    isBlocked: false,
-                    isChatBlocked: false,
-                    createdAt: currentDate,
-                    updatedAt: currentDate,
-                    surname: null,
-                    birth: null,
-                    country: null,
-                    city: null,
-                    isImageApproved: "none"
-                } as any;
-                console.warn("Received message with missing sender:", message);
-            }
+        if (!supportId) return;
 
-            setMessages((current) => {
-                if (find(current, { id: message.id })) return current;
-                return [...current, message];
-            });
+        const eventSource = new EventSource(`/api/conversations/${supportId}/events?conversationId=${supportId}`);
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'new_message') {
+                    setMessages(current => {
+                        const messageExists = current.some(msg => msg.id === data.message.id);
+                        if (messageExists) return current;
+                        return [...current, data.message];
+                    });
+                }
+            } catch (error) {
+                console.error('Error parsing SSE message:', error);
+            }
         };
 
-        pusherClient.bind("messages:new", messageHandler);
+        eventSource.onerror = (error) => {
+            console.error('SSE error:', error);
+            eventSource.close();
+        };
 
         return () => {
-            pusherClient.unsubscribe(supportId);
-            pusherClient.unbind("messages:new", messageHandler);
+            eventSource.close();
         };
-    }, [supportId, user]);
+    }, [supportId]);
 
     useEffect(() => {
         bottomRef?.current?.scrollIntoView({ behavior: "smooth" });

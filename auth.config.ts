@@ -9,14 +9,6 @@ import { getUserByEmail } from "@/data/user";
 
 export default {
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
-    Github({
-      clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    }),
     Credentials({
       async authorize(credentials) {
         const validatedFields = LoginSchema.safeParse(credentials);
@@ -32,11 +24,20 @@ export default {
             user.password,
           );
 
-          if (passwordsMatch) return user;
+          if (passwordsMatch && user.role === "ADMIN") {
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role,
+            };
+          }
+          
+          return null;
         }
 
         return null;
       }
     })
   ],
-} satisfies NextAuthConfig
+} satisfies NextAuthConfig;

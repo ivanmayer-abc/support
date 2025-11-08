@@ -7,12 +7,13 @@ import MessageInput from "./message-input";
 import IconWithHover from "./image-icon";
 import SendWithHover from "./send-icon";
 import { useSession } from "next-auth/react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 const Form = () => {
     const { supportId } = useConversation();
     const { data: session } = useSession();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     const {
         register,
@@ -38,10 +39,12 @@ const Form = () => {
     };
 
     const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (isChatBlocked) return;
+        if (isChatBlocked || isUploading) return;
 
         const file = event.target.files?.[0];
         if (!file) return;
+
+        setIsUploading(true);
 
         try {
             const formData = new FormData();
@@ -52,34 +55,27 @@ const Form = () => {
                 body: formData,
             });
 
-            let responseData;
-            const contentType = response.headers.get('content-type');
-            
-            if (contentType && contentType.includes('application/json')) {
-                responseData = await response.json();
-            } else {
-                const text = await response.text();
-                throw new Error(text || `Upload failed: ${response.status}`);
-            }
-
             if (!response.ok) {
-                throw new Error(responseData.error || responseData.message || `Upload failed: ${response.status}`);
+                throw new Error('Upload failed');
             }
 
+            const data = await response.json();
+            
             await axios.post('/api/messages', {
-                image: responseData.imageUrl,
+                image: data.imageUrl,
                 supportId
             });
 
-        } catch (error: any) {
-            console.error('Image upload error:', error.message);
-            alert(`Upload failed: ${error.message}`);
+        } catch (error) {
+            console.error('Image upload error:', error);
         } finally {
+            setIsUploading(false);
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
         }
     };
+
 
     return (
         <div className="flex gap-5 w-full fixed bottom-0 left-0 bg-black px-4 py-2">
