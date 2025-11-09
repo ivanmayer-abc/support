@@ -22,6 +22,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { 
   ArrowLeft, 
   IndianRupee, 
@@ -34,7 +44,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  MoreVertical
+  Plus
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatter } from "@/lib/utils";
@@ -118,27 +128,35 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
     search: ""
   });
 
+  const [manualTransactionOpen, setManualTransactionOpen] = useState(false);
+  const [creatingTransaction, setCreatingTransaction] = useState(false);
+  const [manualTransactionData, setManualTransactionData] = useState({
+    type: 'deposit',
+    amount: '',
+    status: 'success'
+  });
+
   const itemsPerPage = 10;
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/admin/users/${userId}/transactions`);
-        if (response.ok) {
-          const transactionsData = await response.json();
-          setData(transactionsData);
-        }
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-        toast.error('Error loading transactions');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchUserTransactions();
   }, [userId]);
+
+  const fetchUserTransactions = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/admin/users/${userId}/transactions`);
+      if (response.ok) {
+        const transactionsData = await response.json();
+        setData(transactionsData);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast.error('Error loading transactions');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const updateTransactionStatus = async (transactionId: string, status: string) => {
     try {
@@ -182,6 +200,119 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
       toast.error(`Error: ${errorMessage}`);
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const createManualTransaction = async () => {
+    try {
+      setCreatingTransaction(true);
+
+      const amount = parseFloat(manualTransactionData.amount);
+      if (isNaN(amount) || amount <= 0) {
+        toast.error('Please enter a valid amount greater than 0');
+        return;
+      }
+
+      const response = await fetch('/api/admin/transactions/manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          type: manualTransactionData.type,
+          amount,
+          status: manualTransactionData.status
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP Error: ${response.status}`);
+      }
+
+      const newTransaction = await response.json();
+
+      setData(prevData => {
+        if (!prevData) return null;
+        
+        const addTransaction = (transactions: Transaction[]) => 
+          [newTransaction, ...transactions];
+        
+        return {
+          ...prevData,
+          transactions: {
+            all: addTransaction(prevData.transactions.all),
+            transactionCategory: addTransaction(prevData.transactions.transactionCategory),
+            otherCategory: prevData.transactions.otherCategory
+          },
+          balance: {
+            ...prevData.balance,
+            available: manualTransactionData.status === 'success' 
+              ? manualTransactionData.type === 'deposit' 
+                ? prevData.balance.available + amount
+                : prevData.balance.available - amount
+              : prevData.balance.available,
+            netPending: manualTransactionData.status === 'pending'
+              ? manualTransactionData.type === 'deposit'
+                ? prevData.balance.netPending + amount
+                : prevData.balance.netPending - amount
+              : prevData.balance.netPending,
+            effective: manualTransactionData.status === 'success'
+              ? manualTransactionData.type === 'deposit'
+                ? prevData.balance.effective + amount
+                : prevData.balance.effective - amount
+              : manualTransactionData.status === 'pending'
+                ? manualTransactionData.type === 'deposit'
+                  ? prevData.balance.effective + amount
+                  : prevData.balance.effective - amount
+                : prevData.balance.effective
+          },
+          profitMetrics: manualTransactionData.status === 'success' ? {
+            ...prevData.profitMetrics,
+            transaction: {
+              ...prevData.profitMetrics.transaction,
+              totalDeposits: manualTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.transaction.totalDeposits + amount
+                : prevData.profitMetrics.transaction.totalDeposits,
+              totalWithdrawals: manualTransactionData.type === 'withdrawal'
+                ? prevData.profitMetrics.transaction.totalWithdrawals + amount
+                : prevData.profitMetrics.transaction.totalWithdrawals,
+              netProfit: manualTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.transaction.netProfit + amount
+                : prevData.profitMetrics.transaction.netProfit - amount,
+              transactionCount: prevData.profitMetrics.transaction.transactionCount + 1
+            },
+            overall: {
+              ...prevData.profitMetrics.overall,
+              totalDeposits: manualTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.overall.totalDeposits + amount
+                : prevData.profitMetrics.overall.totalDeposits,
+              totalWithdrawals: manualTransactionData.type === 'withdrawal'
+                ? prevData.profitMetrics.overall.totalWithdrawals + amount
+                : prevData.profitMetrics.overall.totalWithdrawals,
+              netProfit: manualTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.overall.netProfit + amount
+                : prevData.profitMetrics.overall.netProfit - amount
+            }
+          } : prevData.profitMetrics
+        };
+      });
+
+      setManualTransactionData({
+        type: 'deposit',
+        amount: '',
+        status: 'success'
+      });
+      setManualTransactionOpen(false);
+
+      toast.success(`Manual ${manualTransactionData.type} created successfully`);
+    } catch (error) {
+      console.error('Failed to create manual transaction:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create transaction';
+      toast.error(`Error: ${errorMessage}`);
+    } finally {
+      setCreatingTransaction(false);
     }
   };
 
@@ -357,6 +488,289 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
     setCurrentPage(1);
   };
 
+  const StatusDropdown = ({ transaction }: { transaction: Transaction }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+          disabled={updating === transaction.id}
+        >
+          {updating === transaction.id ? (
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+          ) : (
+            <>
+              {getStatusIcon(transaction.status)}
+              <span className="font-medium">{getStatusText(transaction.status)}</span>
+            </>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={() => updateTransactionStatus(transaction.id, 'success')}
+          className="flex items-center gap-2"
+        >
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          Success
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => updateTransactionStatus(transaction.id, 'pending')}
+          className="flex items-center gap-2"
+        >
+          <Clock className="h-4 w-4 text-yellow-600" />
+          Pending
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => updateTransactionStatus(transaction.id, 'fail')}
+          className="flex items-center gap-2"
+        >
+          <XCircle className="h-4 w-4 text-red-600" />
+          Failed
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+const ManualTransactionDialog = () => {
+  const [localTransactionData, setLocalTransactionData] = useState({
+    type: 'deposit' as 'deposit' | 'withdrawal',
+    amount: '',
+    status: 'success' as 'success' | 'pending' | 'fail'
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const amount = parseFloat(localTransactionData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount greater than 0');
+      return;
+    }
+
+    setCreatingTransaction(true);
+
+    try {
+      const response = await fetch('/api/admin/transactions/manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          type: localTransactionData.type,
+          amount,
+          status: localTransactionData.status
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to create transaction';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          errorMessage = `HTTP Error: ${response.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const newTransaction = await response.json();
+
+      setData(prevData => {
+        if (!prevData) return null;
+        
+        const addTransaction = (transactions: Transaction[]) => 
+          [newTransaction, ...transactions];
+        
+        return {
+          ...prevData,
+          transactions: {
+            all: addTransaction(prevData.transactions.all),
+            transactionCategory: addTransaction(prevData.transactions.transactionCategory),
+            otherCategory: prevData.transactions.otherCategory
+          },
+          balance: {
+            ...prevData.balance,
+            available: localTransactionData.status === 'success' 
+              ? localTransactionData.type === 'deposit' 
+                ? prevData.balance.available + amount
+                : prevData.balance.available - amount
+              : prevData.balance.available,
+            netPending: localTransactionData.status === 'pending'
+              ? localTransactionData.type === 'deposit'
+                ? prevData.balance.netPending + amount
+                : prevData.balance.netPending - amount
+              : prevData.balance.netPending,
+            effective: localTransactionData.status === 'success'
+              ? localTransactionData.type === 'deposit'
+                ? prevData.balance.effective + amount
+                : prevData.balance.effective - amount
+              : localTransactionData.status === 'pending'
+                ? localTransactionData.type === 'deposit'
+                  ? prevData.balance.effective + amount
+                  : prevData.balance.effective - amount
+                : prevData.balance.effective
+          },
+          profitMetrics: localTransactionData.status === 'success' ? {
+            ...prevData.profitMetrics,
+            transaction: {
+              ...prevData.profitMetrics.transaction,
+              totalDeposits: localTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.transaction.totalDeposits + amount
+                : prevData.profitMetrics.transaction.totalDeposits,
+              totalWithdrawals: localTransactionData.type === 'withdrawal'
+                ? prevData.profitMetrics.transaction.totalWithdrawals + amount
+                : prevData.profitMetrics.transaction.totalWithdrawals,
+              netProfit: localTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.transaction.netProfit + amount
+                : prevData.profitMetrics.transaction.netProfit - amount,
+              transactionCount: prevData.profitMetrics.transaction.transactionCount + 1
+            },
+            overall: {
+              ...prevData.profitMetrics.overall,
+              totalDeposits: localTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.overall.totalDeposits + amount
+                : prevData.profitMetrics.overall.totalDeposits,
+              totalWithdrawals: localTransactionData.type === 'withdrawal'
+                ? prevData.profitMetrics.overall.totalWithdrawals + amount
+                : prevData.profitMetrics.overall.totalWithdrawals,
+              netProfit: localTransactionData.type === 'deposit'
+                ? prevData.profitMetrics.overall.netProfit + amount
+                : prevData.profitMetrics.overall.netProfit - amount
+            }
+          } : prevData.profitMetrics
+        };
+      });
+
+      setLocalTransactionData({
+        type: 'deposit',
+        amount: '',
+        status: 'success'
+      });
+      setManualTransactionOpen(false);
+
+      toast.success(`Manual ${localTransactionData.type} created successfully`);
+    } catch (error) {
+      console.error('Failed to create manual transaction:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create transaction';
+      toast.error(`Error: ${errorMessage}`);
+    } finally {
+      setCreatingTransaction(false);
+    }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setManualTransactionOpen(open);
+    if (!open) {
+      setLocalTransactionData({
+        type: 'deposit',
+        amount: '',
+        status: 'success'
+      });
+    }
+  };
+
+  return (
+    <Dialog open={manualTransactionOpen} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="h-4 w-4 mr-2" />
+          Manual Transaction
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px] bg-black">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Create manual transaction</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="type" className="text-right">
+                Type
+              </Label>
+              <Select 
+                value={localTransactionData.type} 
+                onValueChange={(value: 'deposit' | 'withdrawal') => 
+                  setLocalTransactionData(prev => ({ ...prev, type: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="deposit">Deposit</SelectItem>
+                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Amount
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                value={localTransactionData.amount}
+                onChange={(e) => setLocalTransactionData(prev => ({ ...prev, amount: e.target.value }))}
+                className="col-span-3"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
+              <Select 
+                value={localTransactionData.status} 
+                onValueChange={(value: 'success' | 'pending' | 'fail') => 
+                  setLocalTransactionData(prev => ({ ...prev, status: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="fail">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="button"
+              variant="outline" 
+              onClick={() => handleOpenChange(false)}
+              disabled={creatingTransaction}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              disabled={creatingTransaction || !localTransactionData.amount}
+            >
+              {creatingTransaction ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                'Create Transaction'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
   if (loading) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
@@ -418,6 +832,9 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
         <div className="bg-black rounded-lg border p-8 text-center text-gray-500">
           <IndianRupee className="h-12 w-12 mx-auto text-gray-400 mb-4" />
           <p className="text-lg">No transactions found for this user.</p>
+          <div className="mt-4">
+            <ManualTransactionDialog />
+          </div>
         </div>
       </div>
     );
@@ -426,51 +843,6 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
   const currentTransactions = getCurrentTransactions();
   const totalPages = getTotalPages();
   const totalFilteredCount = getTotalFilteredCount();
-
-  const StatusDropdown = ({ transaction }: { transaction: Transaction }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-          disabled={updating === transaction.id}
-        >
-          {updating === transaction.id ? (
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
-          ) : (
-            <>
-              {getStatusIcon(transaction.status)}
-              <span className="font-medium">{getStatusText(transaction.status)}</span>
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => updateTransactionStatus(transaction.id, 'success')}
-          className="flex items-center gap-2"
-        >
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          Success
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => updateTransactionStatus(transaction.id, 'pending')}
-          className="flex items-center gap-2"
-        >
-          <Clock className="h-4 w-4 text-yellow-600" />
-          Pending
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => updateTransactionStatus(transaction.id, 'fail')}
-          className="flex items-center gap-2"
-        >
-          <XCircle className="h-4 w-4 text-red-600" />
-          Failed
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -495,6 +867,7 @@ const UserTransactionsPage = ({ params }: UserTransactionsPageProps) => {
               View Conversations
             </Link>
           </Button>
+          <ManualTransactionDialog />
           <Button variant="outline" size="sm" onClick={downloadCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
